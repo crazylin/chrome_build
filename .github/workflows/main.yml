@@ -1,52 +1,38 @@
-name: Build Chromium for Windows
+name: Build Chromium
 
-on:
-  push:
-    branches:
-      - main
+on: [workflow_dispatch]
 
 jobs:
   build:
-    runs-on: windows-latest
+    name: Build Chromium
+    runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
-      
-    - name: Install Visual Studio
-      uses: microsoft/setup-msbuild@v1.0.2
-      
-    - name: Install depot_tools
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential
+        # Install additional dependencies required by Chromium, adjust as needed
+
+    - name: Configure Chromium build
       run: |
         git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
-        echo @echo off > set_path.bat
-        echo set DEPOT_TOOLS_WIN_TOOLCHAIN=0 >> set_path.bat
-        echo set PATH=%CD%\depot_tools;%PATH% >> set_path.bat
-        call set_path.bat
-        gclient
-
-    - name: Fetch Chromium source code
-      run: |
-        mkdir chromium
-        cd chromium
+        export PATH="$PATH:${PWD}/depot_tools"
+        mkdir chromium && cd chromium
         fetch --nohooks --no-history chromium
-
-    - name: Install Chromium build dependencies
-      run: |
-        cd chromium/src
-        build/install-build-deps-win.bat
-
-    - name: Generate build files
-      run: |
-        cd chromium/src
-        gn gen out/Default --args="is_debug=false is_official_build=true symbol_level=0 enable_nacl=false"
+        cd src
+        ./build/install-build-deps.sh
 
     - name: Build Chromium
       run: |
         cd chromium/src
+        gn gen out/Default
         ninja -C out/Default chrome
 
-    - name: Upload Chromium build artifacts
+    - name: Archive Chromium build
       uses: actions/upload-artifact@v2
       with:
         name: chromium-build
